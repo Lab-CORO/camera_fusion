@@ -15,7 +15,7 @@ public:
         sub2_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
             "topic_image_Azure kient", 10, std::bind(&PointCloudFusionNode::callback2, this, std::placeholders::_1));
         pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("fused_pointcloud", 10);
-    }
+    } // coucou
 
 private:
 

@@ -1,3 +1,7 @@
+#ifndef POINTCLOUD_FUSION_HPP
+#define POINTCLOUD_FUSION_HPP
+
+#include <string>
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/image.hpp>
 #include <sensor_msgs/msg/camera_info.hpp>
@@ -17,40 +21,53 @@
 #include <geometry_msgs/msg/transform_stamped.hpp>
 #include <tf2_eigen/tf2_eigen.hpp>
 #include <pcl/common/transforms.h>
-#include <tf2_ros/static_transform_broadcaster.h>
 
-class PointCloudFusionNode : public rclcpp::Node {
-    private:
-        // Definition of the synchronization policy
-        typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::msg::Image, sensor_msgs::msg::CameraInfo> MySyncPolicy;
-        typedef message_filters::Synchronizer<MySyncPolicy> Synchronizer;
-        std::shared_ptr<Synchronizer> sync1_;
-        std::shared_ptr<Synchronizer> sync2_;
+class PointCloudFusionNode : public rclcpp::Node
+{
+public:
+    PointCloudFusionNode(
+        const std::string &depth_image_sub1_topic,
+        const std::string &camera_info_sub1_topic,
+        const std::string &depth_image_sub2_topic,
+        const std::string &camera_info_sub2_topic);
 
-        // Subscriptions for camera 1
-        message_filters::Subscriber<sensor_msgs::msg::Image> depth_image_sub1_;
-        message_filters::Subscriber<sensor_msgs::msg::CameraInfo> camera_info_sub1_;
+private:
+    // Definition of the synchronization policy
+    typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::msg::Image, sensor_msgs::msg::CameraInfo> MySyncPolicy;
+    typedef message_filters::Synchronizer<MySyncPolicy> Synchronizer;
+    std::shared_ptr<Synchronizer> sync1_;
+    std::shared_ptr<Synchronizer> sync2_;
 
-        // Subscriptions for camera 2
-        message_filters::Subscriber<sensor_msgs::msg::Image> depth_image_sub2_;
-        message_filters::Subscriber<sensor_msgs::msg::CameraInfo> camera_info_sub2_;
+    // Subscriptions for camera 1
+    message_filters::Subscriber<sensor_msgs::msg::Image> depth_image_sub1_;
+    message_filters::Subscriber<sensor_msgs::msg::CameraInfo> camera_info_sub1_;
 
-        // TF2 for transformations
-        std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
-        std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
+    // Subscriptions for camera 2
+    message_filters::Subscriber<sensor_msgs::msg::Image> depth_image_sub2_;
+    message_filters::Subscriber<sensor_msgs::msg::CameraInfo> camera_info_sub2_;
 
-        // Static transform broadcaster
-        tf2_ros::StaticTransformBroadcaster static_broadcaster_;
+    // TF2 for transformations
+    std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
+    std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
 
-        // Point clouds for each camera
-        pcl::PointCloud<pcl::PointXYZ>::Ptr cloud1_;
-        pcl::PointCloud<pcl::PointXYZ>::Ptr cloud2_;
+    // Point clouds for each camera
+    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud1_;
+    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud2_;
 
-        // Publisher for the fused point cloud
-        rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_;
+    // Publisher for the fused point cloud
+    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_;
 
-        void PointCloudCallback1(const sensor_msgs::msg::Image::ConstSharedPtr& image_msg,
-                             const sensor_msgs::msg::CameraInfo::ConstSharedPtr& info_msg);
+    void PointCloudCallback1(const sensor_msgs::msg::Image::ConstSharedPtr &image_msg,
+                             const sensor_msgs::msg::CameraInfo::ConstSharedPtr &info_msg);
 
-        
-}
+    void PointCloudCallback2(const sensor_msgs::msg::Image::ConstSharedPtr &image_msg,
+                             const sensor_msgs::msg::CameraInfo::ConstSharedPtr &info_msg);
+
+    pcl::PointCloud<pcl::PointXYZ>::Ptr convertDepthImageToPointCloud(
+        const sensor_msgs::msg::Image::ConstSharedPtr &depth_msg,
+        const sensor_msgs::msg::CameraInfo::ConstSharedPtr &info_msg);
+
+    void fuseClouds();
+};
+
+#endif // POINTCLOUD_FUSION_HPP

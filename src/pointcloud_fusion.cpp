@@ -1,7 +1,7 @@
 #include "pointcloud_fusion.hpp"
 
 #include <string>
-#include <iostream> // Pour std::cerr
+#include <iostream> // for std::cerr
 
 PointCloudFusionNode::PointCloudFusionNode(
     const std::string &depth_image_sub1_topic,
@@ -29,6 +29,12 @@ PointCloudFusionNode::PointCloudFusionNode(
     // Initialize TF2 for transformations
     tf_buffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
     tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
+
+    // timer callback for fusedcloud function
+    // fusepcd every 10ms
+    timer_ = this->create_wall_timer(
+        std::chrono::milliseconds(10),
+        std::bind(&PointCloudFusionNode::fuseClouds, this));
 }
 
 // Callback functions for the two cameras that retrieve the point clouds after their conversion
@@ -37,7 +43,6 @@ void PointCloudFusionNode::PointCloudCallback1(
     const sensor_msgs::msg::CameraInfo::ConstSharedPtr &info_msg)
 {
     cloud1_ = convertDepthImageToPointCloud(image_msg, info_msg);
-    fuseClouds();
 }
 
 void PointCloudFusionNode::PointCloudCallback2(
@@ -45,7 +50,6 @@ void PointCloudFusionNode::PointCloudCallback2(
     const sensor_msgs::msg::CameraInfo::ConstSharedPtr &info_msg)
 {
     cloud2_ = convertDepthImageToPointCloud(image_msg, info_msg);
-    fuseClouds();
 }
 
 // Function to convert a depth image into a point cloud
@@ -80,6 +84,17 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr PointCloudFusionNode::convertDepthImageToPoi
         RCLCPP_ERROR(this->get_logger(), "cv_bridge exception: %s", e.what());
         return nullptr;
     }
+
+    // Get camera intrinsic parameters
+    cv::Mat cameraMatrix(3, 3, CV_64F, (void *)info_msg->k.data());
+    cv::Mat distCoeffs = cv::Mat(info_msg->d);
+
+    // Undistort the depth image
+    cv::Mat undistorted_image;
+    cv::undistort(cv_ptr->image, undistorted_image, cameraMatrix, distCoeffs);
+
+    // Update cv_ptr to point to undistorted image
+    cv_ptr->image = undistorted_image;
 
     // Get the camera intrinsic parameters
     double fx = info_msg->k[0];
@@ -127,7 +142,7 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr PointCloudFusionNode::convertDepthImageToPoi
 
     // Transform the point cloud into the 'map' frame
     std::string from_frame = depth_msg->header.frame_id;
-    std::string to_frame = "map";
+    std::string to_frame = "camera_link";
     geometry_msgs::msg::TransformStamped transform_stamped;
     try
     {
@@ -157,7 +172,7 @@ void PointCloudFusionNode::fuseClouds()
         *fused_cloud = *cloud1_ + *cloud2_;
         sensor_msgs::msg::PointCloud2 output;
         pcl::toROSMsg(*fused_cloud, output);
-        output.header.frame_id = "map";
+        output.header.frame_id = "camera_link";
         output.header.stamp = this->get_clock()->now();
         pub_->publish(output);
 

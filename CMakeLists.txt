@@ -47,6 +47,9 @@ include_directories(
   ${OpenCV_INCLUDE_DIRS}
 )
 
+
+
+
 # Define executable
 add_executable(${PROJECT_NAME}_node
   src/pointcloud_fusion.cpp
@@ -64,32 +67,26 @@ ament_target_dependencies(${PROJECT_NAME}_node ${dependencies_pkgs})
 target_compile_features(${PROJECT_NAME}_node PUBLIC cxx_std_17)
 
 # Install
-install(
-  TARGETS ${PROJECT_NAME}_node
-  EXPORT ${PROJECT_NAME}_node
-  ARCHIVE DESTINATION lib
-  LIBRARY DESTINATION lib
-  RUNTIME DESTINATION bin
-  INCLUDES DESTINATION include
+install( TARGETS 
+  ${PROJECT_NAME}_node
+  DESTINATION lib/${PROJECT_NAME}
 )
 
-install(
-  DIRECTORY include/
-  DESTINATION include/
-)
-
-install(
-  DIRECTORY launch
+install(DIRECTORY 
+  launch
   DESTINATION share/${PROJECT_NAME}/
+  
 )
+
+
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   ament_lint_auto_find_test_dependencies()
 endif()
 
-ament_export_include_directories(include)
-ament_export_targets(${PROJECT_NAME}_node HAS_LIBRARY_TARGET)
-ament_export_dependencies(${dependencies_pkgs})
+# ament_export_include_directories(include)
+# ament_export_targets(${PROJECT_NAME}_node HAS_LIBRARY_TARGET)
+# ament_export_dependencies(${dependencies_pkgs})
 
 ament_package()

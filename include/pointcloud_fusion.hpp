@@ -21,6 +21,8 @@
 #include <geometry_msgs/msg/transform_stamped.hpp>
 #include <tf2_eigen/tf2_eigen.hpp>
 #include <pcl/common/transforms.h>
+#include <opencv2/imgproc.hpp>
+#include <opencv2/calib3d.hpp>
 
 class PointCloudFusionNode : public rclcpp::Node
 {
@@ -57,16 +59,21 @@ private:
     // Publisher for the fused point cloud
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_;
 
+    // we declare a ROS2 timer object for the fusedcloud function
+    rclcpp::TimerBase::SharedPtr timer_;
+
+    /** Get the 2D image from the first camera (realssense2) and start the converting function to pointcloud */
     void PointCloudCallback1(const sensor_msgs::msg::Image::ConstSharedPtr &image_msg,
                              const sensor_msgs::msg::CameraInfo::ConstSharedPtr &info_msg);
 
+    /** Get the 2D image from the second camera (azure kinect) and start the converting function to pointcloud */
     void PointCloudCallback2(const sensor_msgs::msg::Image::ConstSharedPtr &image_msg,
                              const sensor_msgs::msg::CameraInfo::ConstSharedPtr &info_msg);
-
+    /** Convert 2D image to a pointcloud*/
     pcl::PointCloud<pcl::PointXYZ>::Ptr convertDepthImageToPointCloud(
         const sensor_msgs::msg::Image::ConstSharedPtr &depth_msg,
         const sensor_msgs::msg::CameraInfo::ConstSharedPtr &info_msg);
-
+    /** fuse the two pointcloud received from the two camera */
     void fuseClouds();
 };
 

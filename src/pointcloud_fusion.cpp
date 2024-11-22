@@ -192,12 +192,12 @@ int main(int argc, char **argv)
         std::cerr << "Usage: " << argv[0] << " depth_image_sub1_topic camera_info_sub1_topic depth_image_sub2_topic camera_info_sub2_topic\n";
         return 1;
     }
-
+    // link arguments for the pointcloud fusion node
     std::string depth_image_sub1_topic = argv[1];
     std::string camera_info_sub1_topic = argv[2];
     std::string depth_image_sub2_topic = argv[3];
     std::string camera_info_sub2_topic = argv[4];
-
+    // Pass the arguments to the node
     auto node = std::make_shared<PointCloudFusionNode>(
         depth_image_sub1_topic, camera_info_sub1_topic,
         depth_image_sub2_topic, camera_info_sub2_topic);

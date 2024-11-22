@@ -2,7 +2,7 @@ from launch import LaunchDescription
 from launch_ros.actions import Node
 
 def generate_launch_description():
-    # Static transform publisher from 'map' to 'camera_depth_optical_frame'
+    # Static transform publisher from 'camera_link' to 'camera_base'
     static_transform_publisher_1 = Node(
         package='tf2_ros',
         executable='static_transform_publisher',
@@ -11,7 +11,7 @@ def generate_launch_description():
         output='log'
     )
 
-    # Your pointcloud_fusion_node
+    # pointcloud_fusion_node
     pointcloud_fusion_node = Node(
         package='pointcloud_fusion',
         executable='pointcloud_fusion_node',

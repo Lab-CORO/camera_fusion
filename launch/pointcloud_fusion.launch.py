@@ -2,12 +2,20 @@ from launch import LaunchDescription
 from launch_ros.actions import Node
 
 def generate_launch_description():
-    # Static transform publisher from 'camera_link' to 'camera_base'
+     # Static transform publisher for realssense result from calibration
     static_transform_publisher_1 = Node(
         package='tf2_ros',
         executable='static_transform_publisher',
         name='static_transform_publisher_cam1',
-        arguments=['0', '-1', '0', '0', '0', '0', 'camera_link', 'camera_base'],
+        arguments=['-0.0171', '-0.0858', '0.0606', '-0.0287', '-0.0315', '-2.8281', 'camera_link', 'link_6'],
+        output='log'
+    )
+     # Static transform publisher for kinet result from calibration
+    static_transform_publisher_2 = Node(
+        package='tf2_ros',
+        executable='static_transform_publisher',
+        name='static_transform_publisher_cam1',
+        arguments=['-0.1962', '-0.2486', '0.8843', '-1.4077', '-0.1897', '-0.7588', 'camera_base', 'base_link'],
         output='log'
     )
 
@@ -22,5 +30,6 @@ def generate_launch_description():
 
     return LaunchDescription([
         static_transform_publisher_1,
+        static_transform_publisher_2,
         pointcloud_fusion_node,
     ])

@@ -142,7 +142,7 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr PointCloudFusionNode::convertDepthImageToPoi
 
     // Transform the point cloud into the 'map' frame
     std::string from_frame = depth_msg->header.frame_id;
-    std::string to_frame = "camera_link";
+    std::string to_frame = "base_link";
     geometry_msgs::msg::TransformStamped transform_stamped;
     try
     {
@@ -172,7 +172,8 @@ void PointCloudFusionNode::fuseClouds()
         *fused_cloud = *cloud1_ + *cloud2_;
         sensor_msgs::msg::PointCloud2 output;
         pcl::toROSMsg(*fused_cloud, output);
-        output.header.frame_id = "camera_link";
+        
+        output.header.frame_id = "base_link";
         output.header.stamp = this->get_clock()->now();
         pub_->publish(output);
 

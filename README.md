@@ -8,7 +8,6 @@ Before getting started, make sure you have the following:
 
 1. ROS 2 (compatible version with your dependencies)
 2. Drivers for RealSense 2 and Azure Kinect cameras
-3. Colcon for building ROS 2 packages
 
 # Installation and Usage Steps
 
@@ -44,5 +43,4 @@ ros2 launch driver.launch.py
 - Support for RealSense 2 and Azure Kinect cameras.
 - Compatible with 2D images and 3D point clouds using ROS 2.
 
-# Contributors
 

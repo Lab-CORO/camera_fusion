@@ -172,7 +172,7 @@ void PointCloudFusionNode::fuseClouds()
         *fused_cloud = *cloud1_ + *cloud2_;
         sensor_msgs::msg::PointCloud2 output;
         pcl::toROSMsg(*fused_cloud, output);
-        
+
         output.header.frame_id = "base_link";
         output.header.stamp = this->get_clock()->now();
         pub_->publish(output);

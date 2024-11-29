@@ -8,6 +8,7 @@ def generate_launch_description():
         executable='static_transform_publisher',
         name='static_transform_publisher_link6_to_camera_link',
         arguments=[
+            #represent neccesary transform acquired with the calibration
             '-0.0171',  # x
             '-0.0858',  # y
             '0.0606',   # z

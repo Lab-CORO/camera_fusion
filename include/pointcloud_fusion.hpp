@@ -24,7 +24,6 @@
 #include <opencv2/imgproc.hpp>
 #include <opencv2/calib3d.hpp>
 
-
 class PointCloudFusionNode : public rclcpp::Node
 {
 public:

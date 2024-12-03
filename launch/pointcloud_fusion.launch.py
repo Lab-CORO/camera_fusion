@@ -2,19 +2,18 @@ from launch import LaunchDescription
 from launch_ros.actions import Node
 
 def generate_launch_description():
-        # Transformation de 'link_6' vers 'camera_link' (caméra RealSense)
+    # Transformation de 'link_6' vers 'camera_link' (caméra RealSense)
     static_transform_publisher_link6_to_camera_link = Node(
         package='tf2_ros',
         executable='static_transform_publisher',
         name='static_transform_publisher_link6_to_camera_link',
         arguments=[
-            #represent neccesary transform acquired with the calibration
-            '-0.0171',  # x
-            '-0.0858',  # y
-            '0.0606',   # z
-            '-0.0287',  # roll  (en radians)
-            '-0.0315',  # pitch (en radians)
-            '-2.8281', # yaw   (en radians)
+            '0',        # x
+            '-0.0791',  # y
+            '0.03255',  # z
+            '1.5708',   # yaw (en radians)
+            '-1.2491',  # pitch (en radians)
+            '0',        #  roll  (en radians)
             'link_6',
             'camera_link'
         ],
@@ -27,12 +26,12 @@ def generate_launch_description():
         executable='static_transform_publisher',
         name='static_transform_publisher_base_link_to_camera_base',
         arguments=[
-            '0',  # x
-            '0',  # y
-            '0',   # z
-            '0',  # roll  (en radians)
-            '0',  # pitch (en radians)
-            '0',  # yaw   (en radians)
+            '-0.2062',  # x
+            '-0.2086',  # y
+            '0.8843',   # z
+            '0.3666',   # yaw    (en radians)
+            '0.7854',   # pitch (en radians)
+            '0.2668',   # roll   (en radians)
             'base_link',
             'camera_base'
         ],

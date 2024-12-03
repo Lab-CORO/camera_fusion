@@ -2,7 +2,7 @@ from launch import LaunchDescription
 from launch_ros.actions import Node
 
 def generate_launch_description():
-    # Transformation de 'link_6' vers 'camera_link' (caméra RealSense)
+        # Transformation de 'link_6' vers 'camera_link' (caméra RealSense)
     static_transform_publisher_link6_to_camera_link = Node(
         package='tf2_ros',
         executable='static_transform_publisher',

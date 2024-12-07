@@ -2,41 +2,62 @@ from launch import LaunchDescription
 from launch_ros.actions import Node
 
 def generate_launch_description():
+
+
+    #Tf selon les calibration du Tracker Marker
+    tf_computation_node_RS = Node(
+            package='camera_calibration',  
+            executable='rs_tf_computation_node',  
+            name='rs_tf_computation_node',  
+            output='screen',  
+    ),
+
+    tf_computation_node_Kinect = Node(
+            package='camera_calibration',  
+            executable='kinect_tf_computation_node',  
+            name='kinect_tf_computation_node',  
+            output='screen',  
+    ),
+
+
+    #Tf selon les calibration manuelle avec les models 3D
+
     # Transformation de 'link_6' vers 'camera_link' (caméra RealSense)
-    static_transform_publisher_link6_to_camera_link = Node(
-        package='tf2_ros',
-        executable='static_transform_publisher',
-        name='static_transform_publisher_link6_to_camera_link',
-        arguments=[
-            '0',        # x
-            '-0.0791',  # y
-            '0.03255',  # z
-            '1.5708',   # yaw (en radians)
-            '-1.2491',  # pitch (en radians)
-            '0',        #  roll  (en radians)
-            'link_6',
-            'camera_link'
-        ],
-        output='log'
-    )
+    # static_transform_publisher_link6_to_camera_link = Node(
+    #     package='tf2_ros',
+    #     executable='static_transform_publisher',
+    #     name='static_transform_publisher_link6_to_camera_link',
+    #     arguments=[
+    #         '0',        # x
+    #         '-0.0791',  # y
+    #         '0.03255',  # z
+    #         '1.5708',   # yaw (en radians)
+    #         '-1.2491',  # pitch (en radians)
+    #         '0',        #  roll  (en radians)
+    #         'link_6',
+    #         'camera_link'
+    #     ],
+    #     output='log'
+    # )
+
 
     # Transformation de 'base_link' vers 'camera_base' (caméra Azure Kinect)
-    static_transform_publisher_base_link_to_camera_base = Node(
-        package='tf2_ros',
-        executable='static_transform_publisher',
-        name='static_transform_publisher_base_link_to_camera_base',
-        arguments=[
-            '-0.2062',  # x
-            '-0.2086',  # y
-            '0.8843',   # z
-            '0.3666',   # yaw    (en radians)
-            '0.7854',   # pitch (en radians)
-            '0.2668',   # roll   (en radians)
-            'base_link',
-            'camera_base'
-        ],
-        output='log'
-    )
+    # static_transform_publisher_base_link_to_camera_base = Node(
+    #     package='tf2_ros',
+    #     executable='static_transform_publisher',
+    #     name='static_transform_publisher_base_link_to_camera_base',
+    #     arguments=[
+    #         '-0.2062',  # x
+    #         '-0.2086',  # y
+    #         '0.8843',   # z
+    #         '0.3666',   # yaw    (en radians)
+    #         '0.7854',   # pitch (en radians)
+    #         '0.2668',   # roll   (en radians)
+    #         'base_link',
+    #         'camera_base'
+    #     ],
+    #     output='log'
+    # )
 
     # pointcloud_fusion_node (inchangé)
     pointcloud_fusion_node = Node(
@@ -53,7 +74,9 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
-        static_transform_publisher_link6_to_camera_link,
-        static_transform_publisher_base_link_to_camera_base,
+        #static_transform_publisher_link6_to_camera_link,
+        tf_computation_node_RS,
+        tf_computation_node_Kinect,
+        #static_transform_publisher_base_link_to_camera_base,
         pointcloud_fusion_node,
     ])

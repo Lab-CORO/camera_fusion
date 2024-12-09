@@ -89,12 +89,6 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr PointCloudFusionNode::convertDepthImageToPoi
     cv::Mat cameraMatrix(3, 3, CV_64F, (void *)info_msg->k.data());
     cv::Mat distCoeffs = cv::Mat(info_msg->d);
 
-    // Undistort the depth image
-    cv::Mat undistorted_image;
-    cv::undistort(cv_ptr->image, undistorted_image, cameraMatrix, distCoeffs);
-
-    // Update cv_ptr to point to undistorted image
-    cv_ptr->image = undistorted_image;
 
     // Get the camera intrinsic parameters
     double fx = info_msg->k[0];

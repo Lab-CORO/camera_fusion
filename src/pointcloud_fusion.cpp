@@ -1,64 +1,203 @@
-#include <rclcpp/rclcpp.hpp>
-#include <sensor_msgs/msg/point_cloud2.hpp>
-#include <pcl_conversions/pcl_conversions.h>
-#include <pcl/point_cloud.h>
-#include <pcl/point_types.h>
+#include "pointcloud_fusion.hpp"
 
-class PointCloudFusionNode : public rclcpp::Node {
-public:
-    PointCloudFusionNode() : Node("pointcloud_fusion_node") 
+#include <string>
+#include <iostream> // for std::cerr
+
+PointCloudFusionNode::PointCloudFusionNode(
+    const std::string &depth_image_sub1_topic,
+    const std::string &camera_info_sub1_topic,
+    const std::string &depth_image_sub2_topic,
+    const std::string &camera_info_sub2_topic) : Node("pointcloud_fusion_node")
+{
+    // Initialize subscriptions for camera 1
+    depth_image_sub1_.subscribe(this, depth_image_sub1_topic);
+    camera_info_sub1_.subscribe(this, camera_info_sub1_topic);
+    sync1_ = std::make_shared<Synchronizer>(MySyncPolicy(10), depth_image_sub1_, camera_info_sub1_);
+    sync1_->registerCallback(
+        std::bind(&PointCloudFusionNode::PointCloudCallback1, this, std::placeholders::_1, std::placeholders::_2));
+
+    // Initialize subscriptions for camera 2
+    depth_image_sub2_.subscribe(this, depth_image_sub2_topic);
+    camera_info_sub2_.subscribe(this, camera_info_sub2_topic);
+    sync2_ = std::make_shared<Synchronizer>(MySyncPolicy(10), depth_image_sub2_, camera_info_sub2_);
+    sync2_->registerCallback(
+        std::bind(&PointCloudFusionNode::PointCloudCallback2, this, std::placeholders::_1, std::placeholders::_2));
+
+    // Initialize the publisher for the fused point cloud
+    pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("fused_pointcloud", 10);
+
+    // Initialize TF2 for transformations
+    tf_buffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
+    tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
+
+    // timer callback for fusedcloud function
+    // fusepcd every 10ms
+    timer_ = this->create_wall_timer(
+        std::chrono::milliseconds(10),
+        std::bind(&PointCloudFusionNode::fuseClouds, this));
+}
+
+// Callback functions for the two cameras that retrieve the point clouds after their conversion
+void PointCloudFusionNode::PointCloudCallback1(
+    const sensor_msgs::msg::Image::ConstSharedPtr &image_msg,
+    const sensor_msgs::msg::CameraInfo::ConstSharedPtr &info_msg)
+{
+    cloud1_ = convertDepthImageToPointCloud(image_msg, info_msg);
+}
+
+void PointCloudFusionNode::PointCloudCallback2(
+    const sensor_msgs::msg::Image::ConstSharedPtr &image_msg,
+    const sensor_msgs::msg::CameraInfo::ConstSharedPtr &info_msg)
+{
+    cloud2_ = convertDepthImageToPointCloud(image_msg, info_msg);
+}
+
+// Function to convert a depth image into a point cloud
+pcl::PointCloud<pcl::PointXYZ>::Ptr PointCloudFusionNode::convertDepthImageToPointCloud(
+    const sensor_msgs::msg::Image::ConstSharedPtr &depth_msg,
+    const sensor_msgs::msg::CameraInfo::ConstSharedPtr &info_msg)
+{
+    // Determine the scale factor
+    float depth_scale = 1.0f;
+    if (depth_msg->encoding == sensor_msgs::image_encodings::TYPE_16UC1)
     {
-        //s'abonne au topic conetant le pointcloud de la RealSense et Azaure Kinet
-        // et crée le topic qui vas contenri le pointcloud fusionner
-        sub1_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
-            "topic_image_realsense1", 10, std::bind(&PointCloudFusionNode::callback1, this, std::placeholders::_1));
-        sub2_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
-            "topic_image_Azure kient", 10, std::bind(&PointCloudFusionNode::callback2, this, std::placeholders::_1));
-        pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("fused_pointcloud", 10);
+        depth_scale = 0.001f; // Convert from millimeters to meters
     }
-
-private:
-
-    // pour manipulation des pointclouds
-    void callback1(const sensor_msgs::msg::PointCloud2::SharedPtr msg) {
-        pcl::PointCloud<pcl::PointXYZ>::Ptr cloud1(new pcl::PointCloud<pcl::PointXYZ>());
-        pcl::fromROSMsg(*msg, *cloud1);
-        cloud1_ = cloud1;
-        fuseClouds();
-    }
-
-    void callback2(const sensor_msgs::msg::PointCloud2::SharedPtr msg) {
-        pcl::PointCloud<pcl::PointXYZ>::Ptr cloud2(new pcl::PointCloud<pcl::PointXYZ>());
-        pcl::fromROSMsg(*msg, *cloud2);
-        cloud2_ = cloud2;
-        fuseClouds();
-    }
-
-    void fuseClouds() 
+    else if (depth_msg->encoding == sensor_msgs::image_encodings::TYPE_32FC1)
     {
-        //verifie si le cloud contient des données et fusionne si oui 
-        if (cloud1_ && !cloud1_->empty() && cloud2_ && !cloud2_->empty()) {
-            pcl::PointCloud<pcl::PointXYZ>::Ptr fused_cloud(new pcl::PointCloud<pcl::PointXYZ>());
-            *fused_cloud = *cloud1_ + *cloud2_;
-            sensor_msgs::msg::PointCloud2 output;
-            pcl::toROSMsg(*fused_cloud, output);
-            output.header.frame_id = "map";
-            pub_->publish(output);
+        depth_scale = 1.0f;
+    }
+    else
+    {
+        RCLCPP_ERROR(this->get_logger(), "Unsupported depth image encoding: %s", depth_msg->encoding.c_str());
+        return nullptr;
+    }
+
+    // Convert the depth image to an OpenCV image for easier point cloud conversion
+    cv_bridge::CvImagePtr cv_ptr;
+    try
+    {
+        cv_ptr = cv_bridge::toCvCopy(depth_msg, depth_msg->encoding);
+    }
+    catch (cv_bridge::Exception &e)
+    {
+        RCLCPP_ERROR(this->get_logger(), "cv_bridge exception: %s", e.what());
+        return nullptr;
+    }
+
+    // Get camera intrinsic parameters
+    cv::Mat cameraMatrix(3, 3, CV_64F, (void *)info_msg->k.data());
+    cv::Mat distCoeffs = cv::Mat(info_msg->d);
+
+
+    // Get the camera intrinsic parameters
+    double fx = info_msg->k[0];
+    double fy = info_msg->k[4];
+    double cx = info_msg->k[2];
+    double cy = info_msg->k[5];
+
+    // Create the point cloud in the camera frame
+    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>());
+
+    // Iterate over each pixel in the depth image to convert to point cloud
+    for (int v = 0; v < cv_ptr->image.rows; ++v)
+    {
+        for (int u = 0; u < cv_ptr->image.cols; ++u)
+        {
+            float z = 0.0f;
+            if (depth_msg->encoding == sensor_msgs::image_encodings::TYPE_16UC1)
+            {
+                uint16_t depth = cv_ptr->image.at<uint16_t>(v, u);
+                z = depth * depth_scale;
+            }
+            else if (depth_msg->encoding == sensor_msgs::image_encodings::TYPE_32FC1)
+            {
+                z = cv_ptr->image.at<float>(v, u) * depth_scale;
+            }
+
+            if (z > 0.0f && std::isfinite(z))
+            {
+                float x = (u - cx) * z / fx;
+                float y = (v - cy) * z / fy;
+
+                pcl::PointXYZ point;
+                point.x = x;
+                point.y = y;
+                point.z = z;
+
+                cloud->points.push_back(point);
+            }
         }
     }
 
-    rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr sub1_;
-    rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr sub2_;
-    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_;
-    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud1_;
-    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud2_;
-};
+    cloud->width = static_cast<uint32_t>(cloud->points.size());
+    cloud->height = 1;
+    cloud->is_dense = false;
 
-int main(int argc, char **argv) 
+    // Transform the point cloud into the 'map' frame
+    std::string from_frame = depth_msg->header.frame_id;
+    std::string to_frame = "base_link";
+    geometry_msgs::msg::TransformStamped transform_stamped;
+    try
+    {
+        transform_stamped = tf_buffer_->lookupTransform(to_frame, from_frame, tf2::TimePointZero);
+    }
+    catch (tf2::TransformException &ex)
+    {
+        RCLCPP_WARN(this->get_logger(), "Could not transform %s to %s: %s", from_frame.c_str(), to_frame.c_str(), ex.what());
+        return nullptr;
+    }
+
+    Eigen::Affine3d transform = tf2::transformToEigen(transform_stamped.transform);
+
+    // Apply the transformation to the point cloud
+    pcl::transformPointCloud(*cloud, *cloud, transform);
+
+    return cloud;
+}
+
+// Function to fuse the point clouds
+void PointCloudFusionNode::fuseClouds()
 {
-    //démarre ros2
+    // Check if both point clouds are available; if they are empty, the fusion will not occur
+    if (cloud1_ && !cloud1_->empty() && cloud2_ && !cloud2_->empty())
+    {
+        pcl::PointCloud<pcl::PointXYZ>::Ptr fused_cloud(new pcl::PointCloud<pcl::PointXYZ>());
+        *fused_cloud = *cloud1_ + *cloud2_;
+        sensor_msgs::msg::PointCloud2 output;
+        pcl::toROSMsg(*fused_cloud, output);
+
+        output.header.frame_id = "base_link";
+        output.header.stamp = this->get_clock()->now();
+        pub_->publish(output);
+
+        // Reset the point clouds after publishing
+        cloud1_.reset();
+        cloud2_.reset();
+    }
+}
+
+int main(int argc, char **argv)
+{
+    // Initialize ROS2
     rclcpp::init(argc, argv);
-    rclcpp::spin(std::make_shared<PointCloudFusionNode>());
+
+    if (argc < 5)
+    {
+        std::cerr << "Usage: " << argv[0] << " depth_image_sub1_topic camera_info_sub1_topic depth_image_sub2_topic camera_info_sub2_topic\n";
+        return 1;
+    }
+    // link arguments for the pointcloud fusion node
+    std::string depth_image_sub1_topic = argv[1];
+    std::string camera_info_sub1_topic = argv[2];
+    std::string depth_image_sub2_topic = argv[3];
+    std::string camera_info_sub2_topic = argv[4];
+    // Pass the arguments to the node
+    auto node = std::make_shared<PointCloudFusionNode>(
+        depth_image_sub1_topic, camera_info_sub1_topic,
+        depth_image_sub2_topic, camera_info_sub2_topic);
+
+    rclcpp::spin(node);
     rclcpp::shutdown();
     return 0;
 }
